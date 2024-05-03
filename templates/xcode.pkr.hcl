@@ -15,11 +15,6 @@ variable "xcode_version" {
   type = list(string)
 }
 
-variable "tag" {
-  type = string
-  default = ""
-}
-
 variable "disk_size" {
   type = number
   default = 100
@@ -38,7 +33,7 @@ variable "android_sdk_tools_version" {
 source "tart-cli" "tart" {
   vm_base_name = "ghcr.io/cirruslabs/macos-${var.macos_version}-base:latest"
   // use tag or the last element of the xcode_version list
-  vm_name      = "${var.macos_version}-xcode:${var.tag != "" ? var.tag : var.xcode_version[length(var.xcode_version) - 1]}"
+  vm_name      = "${var.vm_name}"
   cpu_count    = 4
   memory_gb    = 8
   disk_size_gb = var.disk_size
