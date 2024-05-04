@@ -13,4 +13,4 @@ fi
 
 packer build \
 	-var-file="$VARS_FILE" \
-	"$REPO_ROOT/templates/ensemble.hcl"
+	"$REPO_ROOT/templates/ensemble.pkr.hcl"
