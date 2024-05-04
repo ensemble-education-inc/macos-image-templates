@@ -15,32 +15,39 @@ variable "xcode_version" {
   type = list(string)
 }
 
-variable "tag" {
-  type = string
-  default = ""
-}
-
 variable "disk_size" {
   type = number
   default = 90
 }
 
-variable "android_sdk_tools_version" {
-  type    = string
-  default = "11076708" # https://developer.android.com/studio/#command-tools
+variable "vm_name" {
+  type = string
 }
 
 source "tart-cli" "tart" {
   vm_base_name = "ghcr.io/cirruslabs/macos-${var.macos_version}-base:latest"
   // use tag or the last element of the xcode_version list
-  vm_name      = "${var.macos_version}-xcode:${var.tag != "" ? var.tag : var.xcode_version[length(var.xcode_version) - 1]}"
+  vm_name      = "${var.vm_name}"
   cpu_count    = 4
   memory_gb    = 8
   disk_size_gb = var.disk_size
   headless     = true
-  ssh_password = "admin"
+  ssh_password = "runner"
   ssh_username = "admin"
   ssh_timeout  = "120s"
+  boot_command = [
+    # Skip over "Macintosh" and select "Options"
+    # to boot into macOS Recovery
+    "<wait60s><right><right><enter>",
+    # Open Terminal
+    "<wait10s><leftAltOn>T<leftAltOff>",
+    # Disable SIP
+    "<wait10s>csrutil disable<enter>",
+    "<wait10s>y<enter>",
+    "<wait10s>admin<enter>",
+    # Shutdown
+    "<wait10s>halt<enter>"
+  ]
 }
 
 build {
@@ -65,25 +72,6 @@ build {
   provisioner "shell" {
     inline = [
       "source ~/.zprofile",
-      "brew install openjdk@17",
-      "echo 'export PATH=\"/opt/homebrew/opt/openjdk@17/bin:$PATH\"' >> ~/.zprofile",
-      "echo 'export ANDROID_HOME=$HOME/android-sdk' >> ~/.zprofile",
-      "echo 'export ANDROID_SDK_ROOT=$ANDROID_HOME' >> ~/.zprofile",
-      "echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator' >> ~/.zprofile",
-      "source ~/.zprofile",
-      "wget -q https://dl.google.com/android/repository/commandlinetools-mac-${var.android_sdk_tools_version}_latest.zip -O android-sdk-tools.zip",
-      "mkdir -p $ANDROID_HOME/cmdline-tools/",
-      "unzip -q android-sdk-tools.zip -d $ANDROID_HOME/cmdline-tools/",
-      "rm android-sdk-tools.zip",
-      "mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest",
-      "yes | sdkmanager --licenses",
-      "yes | sdkmanager 'platform-tools' 'platforms;android-33' 'build-tools;34.0.0' 'ndk;25.2.9519653'"
-    ]
-  }
-
-  provisioner "shell" {
-    inline = [
-      "source ~/.zprofile",
       "brew install xcodesorg/made/xcodes",
       "xcodes version",
     ]
@@ -103,39 +91,6 @@ build {
     ]
   }
 
-  provisioner "shell" {
-    inline = [
-      "source ~/.zprofile",
-      "echo 'export FLUTTER_HOME=$HOME/flutter' >> ~/.zprofile",
-      "echo 'export PATH=$HOME/flutter:$HOME/flutter/bin/:$HOME/flutter/bin/cache/dart-sdk/bin:$PATH' >> ~/.zprofile",
-      "source ~/.zprofile",
-      "git clone https://github.com/flutter/flutter.git $FLUTTER_HOME",
-      "cd $FLUTTER_HOME",
-      "git checkout stable",
-      "flutter doctor --android-licenses",
-      "flutter doctor",
-      "flutter precache",
-    ]
-  }
-  provisioner "shell" {
-    inline = [
-      "source ~/.zprofile",
-      "brew install libimobiledevice ideviceinstaller ios-deploy fastlane carthage",
-      "gem update",
-      "gem install cocoapods",
-      "gem uninstall --ignore-dependencies ffi && gem install ffi -- --enable-libffi-alloc"
-    ]
-  }
-
-  # useful utils for mobile development
-  provisioner "shell" {
-    inline = [
-      "source ~/.zprofile",
-      "brew install graphicsmagick imagemagick",
-      "brew install wix/brew/applesimutils"
-    ]
-  }
-
   # inspired by https://github.com/actions/runner-images/blob/fb3b6fd69957772c1596848e2daaec69eabca1bb/images/macos/provision/configuration/configure-machine.sh#L33-L61
   provisioner "shell" {
     inline = [
@@ -148,13 +103,6 @@ build {
       "sudo ./add-certificate AppleWWDRCAG3.cer",
       "sudo ./add-certificate DeveloperIDG2CA.cer",
       "rm add-certificate* *.cer"
-    ]
-  }
-
-  provisioner "shell" {
-    inline = [
-      "source ~/.zprofile",
-      "flutter doctor"
     ]
   }
 
