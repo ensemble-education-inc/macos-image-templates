@@ -12,5 +12,5 @@ fi
 # make sure needed Xcode xip versions are in place in ~/XcodesCache
 
 packer build \
-	-var-file="$VARS_FILE"
-"$REPO_ROOT/templates/xcode.pkr.hcl"
+	-var-file="$VARS_FILE" \
+	"$REPO_ROOT/templates/xcode.pkr.hcl"
