@@ -1,0 +1,6 @@
+{
+  "vm_name": "ensemble-mini-RENAME",
+  "macos_version": "sonoma",
+  "xcode_version": ["15.2.0", "15.3.0"],
+  "disk_size": 150
+}
