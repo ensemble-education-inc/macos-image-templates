@@ -93,13 +93,6 @@ build {
     ]
   }
 
-  provisioner "shell" {
-    inline = [
-      "source ~/.zprofile",
-      "flutter doctor"
-    ]
-  }
-
   // check there is at least 20GB of free space and fail if not
   provisioner "shell" {
     inline = [
