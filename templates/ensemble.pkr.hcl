@@ -91,6 +91,14 @@ build {
     ]
   }
 
+  # useful utils for mobile development
+  provisioner "shell" {
+    inline = [
+      "source ~/.zprofile",
+      "brew install imagemagick"
+    ]
+  }
+
   # inspired by https://github.com/actions/runner-images/blob/fb3b6fd69957772c1596848e2daaec69eabca1bb/images/macos/provision/configuration/configure-machine.sh#L33-L61
   provisioner "shell" {
     inline = [
