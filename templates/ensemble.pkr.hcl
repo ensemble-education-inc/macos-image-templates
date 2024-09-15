@@ -50,6 +50,35 @@ source "tart-cli" "tart" {
   ]
 }
 
+locals {
+	xcode_16 = [for xcode in var.xcode_version: xcode if startswith("16")]
+	other_xcodes = [for xcode in var.xcode_version: xcode if !startswith("16")]
+	
+	xcode_provisioners = concat(
+		[for version in local.other_xcodes: {
+			type = "shell"
+			inline = [
+				"source ~/.zprofile",
+				"sudo xcodes install ${version} --experimental-unxip --path /Users/admin/Downloads/Xcode_${version}.xip --select --empty-trash",
+				"xcodebuild -downloadPlatform iOS",
+				"xcodebuild -runFirstLaunch",
+				"xcrun simctl runtime add"
+			]
+		}],
+		[for version in local.xcode_16: {
+			type = "shell"
+			inline = [
+				"source ~/.zprofile",
+				"sudo xcodes install ${version} --experimental-unxip --path /Users/admin/Downloads/Xcode_${version}.xip --select --empty-trash",
+				"xcodebuild -runFirstLaunch",
+				"xcodebuild -downloadPlatform iOS -exportPath /Users/admin/Downloads/Runtimes/${version}",
+				"DMG_PATH=$(find ~/Downloads/Runtimes/${version} -name \"*.dmg\" -maxdepth 1 -print -quit)",
+				"xcodebuild -import iOS $DMG_PATH",
+			]
+		}]
+	)
+}
+
 build {
   sources = ["source.tart-cli.tart"]
 
@@ -84,12 +113,13 @@ build {
 
   // iterate over all Xcode versions and install them
   // select the latest one as the default
-  provisioner "shell" {
-    inline = [
-      for version in var.xcode_version :
-      "source ~/.zprofile && sudo xcodes install ${version} --experimental-unxip --path /Users/admin/Downloads/Xcode_${version}.xip --select --empty-trash && xcodebuild -downloadAllPlatforms && xcodebuild -runFirstLaunch"
-    ]
-  }
+	dynamic "provisioner" {
+		for_each = local.xcode_provisioners, 
+		labels = ["shell"]
+		content {
+			inline = provisioner.value.inline
+		}
+	}
 
   # useful utils for mobile development
   provisioner "shell" {
