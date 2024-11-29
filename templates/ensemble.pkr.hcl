@@ -51,31 +51,23 @@ source "tart-cli" "tart" {
 }
 
 locals {
-	xcode_16 = [for xcode in var.xcode_version: xcode if substr(xcode, 0, 2) == "16"]
-	other_xcodes = [for xcode in var.xcode_version: xcode if substr(xcode, 0, 2) != "16"]
-
-	xcode_provisioners = concat(
-		[for version in local.other_xcodes: {
-			type = "shell"
-			inline = [
-				"source ~/.zprofile",
-				"sudo xcodes install ${version} --experimental-unxip --path /Users/admin/Downloads/Xcode_${version}.xip --select --empty-trash",
-				"xcodebuild -downloadAllPlatforms",
-				"xcodebuild -runFirstLaunch",
-			]
-		}],
-		[for version in local.xcode_16: {
-			type = "shell"
-			inline = [
-				"source ~/.zprofile",
-				"sudo xcodes install ${version} --experimental-unxip --path /Users/admin/Downloads/Xcode_${version}.xip --select --empty-trash",
-				"xcodebuild -runFirstLaunch",
-#				"xcodebuild -downloadPlatform iOS -exportPath /Users/admin/Downloads/Runtimes/${version}",
-#				"DMG_PATH=$(find ~/Downloads/Runtimes/${version} -name \"*.dmg\" -maxdepth 1 -print -quit)",
-#				"xcodebuild -import iOS $DMG_PATH",
-			]
-		}]
-	)
+  xcode_install_provisioners = [
+    for version in reverse(sort(var.xcode_version)) : {
+      type = "shell"
+      inline = [
+        "source ~/.zprofile",
+        "sudo xcodes install ${version} --experimental-unxip --path /Users/admin/XcodeInstallers/Xcode-${version}.xip --select --empty-trash",
+        // get selected xcode path, strip /Contents/Developer and move to GitHub compatible locations
+        "INSTALLED_PATH=$(xcodes select -p)",
+        "CONTENTS_DIR=$(dirname $INSTALLED_PATH)",
+        "APP_DIR=$(dirname $CONTENTS_DIR)",
+        "sudo mv $APP_DIR /Applications/Xcode_${version}.app",
+        "sudo xcode-select -s /Applications/Xcode_${version}.app",
+        "xcodebuild -downloadAllPlatforms",
+        "xcodebuild -runFirstLaunch",
+      ]
+    }
+  ]
 }
 
 build {

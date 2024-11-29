@@ -1,0 +1,6 @@
+{
+  "vm_name": "ensemble-xcode-16",
+  "macos_version": "sonoma",
+  "xcode_version": ["16.0.0"],
+  "disk_size": 100
+}
