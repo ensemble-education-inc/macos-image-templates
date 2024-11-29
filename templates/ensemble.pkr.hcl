@@ -54,7 +54,7 @@ locals {
       type = "shell"
       inline = [
         "source ~/.zprofile",
-        "sudo xcodes install ${version} --experimental-unxip --path /Users/admin/XcodesCache/Xcode-${version}.xip --select --empty-trash",
+        "sudo xcodes install ${version} --experimental-unxip --path /Users/admin/Downloads/Xcode-${version}.xip --select --empty-trash",
         // get selected xcode path, strip /Contents/Developer and move to GitHub compatible locations
         "INSTALLED_PATH=$(xcodes select -p)",
         "CONTENTS_DIR=$(dirname $INSTALLED_PATH)",
