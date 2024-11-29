@@ -59,8 +59,8 @@ locals {
         "INSTALLED_PATH=$(xcodes select -p)",
         "CONTENTS_DIR=$(dirname $INSTALLED_PATH)",
         "APP_DIR=$(dirname $CONTENTS_DIR)",
-        "sudo mv $APP_DIR /Applications/Xcode_${version}.app",
-        "sudo xcode-select -s /Applications/Xcode_${version}.app",
+        "sudo mv $APP_DIR /Applications/Xcode-${version}.app",
+        "sudo xcode-select -s /Applications/Xcode-${version}.app",
         "xcodebuild -downloadAllPlatforms",
         "xcodebuild -runFirstLaunch",
       ]
