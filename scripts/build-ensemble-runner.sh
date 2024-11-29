@@ -7,6 +7,8 @@ VARS_FILE="$REPO_ROOT/scripts/variables.json"
 
 tart pull "ghcr.io/cirruslabs/macos-sonoma-base:latest"
 
+packer init "$REPO_ROOT/templates/ensemble.pkr.hcl"
+
 packer build \
 	-var-file="$VARS_FILE" \
 	"$REPO_ROOT/templates/ensemble.pkr.hcl"
