@@ -80,11 +80,6 @@ build {
     ]
   }
 
-  // Re-install the GitHub Actions runner
-  provisioner "shell" {
-    script = "scripts/install-actions-runner.sh"
-  }
-
   // make sure our workaround from base is still valid
   provisioner "shell" {
     inline = [
