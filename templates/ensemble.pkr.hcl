@@ -15,19 +15,30 @@ variable "xcode_version" {
   type = list(string)
 }
 
-variable "disk_size" {
-  type = number
-  default = 90
+variable "additional_runtimes" {
+  type = list(string)
+  default = []
 }
 
-variable "vm_name" {
+variable "tag" {
   type = string
+  default = ""
+}
+
+variable "disk_size" {
+  type = number
+  default = 100
+}
+
+variable "disk_free_mb" {
+  type = number
+  default = 15000
 }
 
 source "tart-cli" "tart" {
   vm_base_name = "ghcr.io/cirruslabs/macos-${var.macos_version}-base:latest"
   // use tag or the last element of the xcode_version list
-  vm_name      = "${var.vm_name}"
+  vm_name      = "${var.macos_version}-xcode:${var.tag != "" ? var.tag : var.xcode_version[0]}"
   cpu_count    = 4
   memory_gb    = 8
   disk_size_gb = var.disk_size
@@ -35,19 +46,6 @@ source "tart-cli" "tart" {
   ssh_password = "admin"
   ssh_username = "admin"
   ssh_timeout  = "120s"
-  boot_command = [
-    # Skip over "Macintosh" and select "Options"
-    # to boot into macOS Recovery
-    "<wait60s><right><right><enter>",
-    # Open Terminal
-    "<wait10s><leftAltOn>T<leftAltOff>",
-    # Disable SIP
-    "<wait10s>csrutil disable<enter>",
-    "<wait10s>y<enter>",
-    "<wait10s>admin<enter>",
-    # Shutdown
-    "<wait10s>halt<enter>"
-  ]
 }
 
 locals {
@@ -56,7 +54,7 @@ locals {
       type = "shell"
       inline = [
         "source ~/.zprofile",
-        "sudo xcodes install ${version} --experimental-unxip --path /Users/admin/XcodeInstallers/Xcode-${version}.xip --select --empty-trash",
+        "sudo xcodes install ${version} --experimental-unxip --path /Users/admin/XcodeArchive/Xcode-${version}.xip --select --empty-trash",
         // get selected xcode path, strip /Contents/Developer and move to GitHub compatible locations
         "INSTALLED_PATH=$(xcodes select -p)",
         "CONTENTS_DIR=$(dirname $INSTALLED_PATH)",
@@ -79,14 +77,19 @@ build {
       "brew --version",
       "brew update",
       "brew upgrade",
-      "brew install curl wget unzip zip ca-certificates",
-      "sudo softwareupdate --install-rosetta --agree-to-license"
     ]
   }
 
   // Re-install the GitHub Actions runner
   provisioner "shell" {
     script = "scripts/install-actions-runner.sh"
+  }
+
+  // make sure our workaround from base is still valid
+  provisioner "shell" {
+    inline = [
+      "sudo ln -s /Users/admin /Users/runner || true"
+    ]
   }
 
   provisioner "shell" {
@@ -104,19 +107,44 @@ build {
 
   // iterate over all Xcode versions and install them
   // select the latest one as the default
-	dynamic "provisioner" {
-		for_each = local.xcode_provisioners
-		labels = ["shell"]
-		content {
-			inline = provisioner.value.inline
-		}
-	}
+  dynamic "provisioner" {
+    for_each = local.xcode_install_provisioners
+    labels = ["shell"]
+    content {
+      inline = provisioner.value.inline
+    }
+  }
+
+  provisioner "shell" {
+    inline = [
+      "source ~/.zprofile",
+      "sudo xcodes select '${var.xcode_version[0]}'",
+    ]
+  }
+
+  provisioner "shell" {
+    inline = concat(
+      ["source ~/.zprofile"],
+      [
+        for runtime in var.additional_runtimes : "sudo xcodes runtimes install ${runtime}"
+      ]
+    )
+  }
+
+  provisioner "shell" {
+    inline = [
+      "source ~/.zprofile",
+      "brew install libimobiledevice ideviceinstaller ios-deploy",
+      "gem update",
+      "gem uninstall --ignore-dependencies ffi && gem install ffi -- --enable-libffi-alloc"
+    ]
+  }
 
   # useful utils for mobile development
   provisioner "shell" {
     inline = [
       "source ~/.zprofile",
-      "brew install imagemagick"
+      "brew install graphicsmagick imagemagick"
     ]
   }
 
@@ -124,7 +152,6 @@ build {
   provisioner "shell" {
     inline = [
       "source ~/.zprofile",
-      "sudo security delete-certificate -Z FF6797793A3CD798DC5B2ABEF56F73EDC9F83A64 /Library/Keychains/System.keychain",
       "curl -o AppleWWDRCAG3.cer https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer",
       "curl -o DeveloperIDG2CA.cer https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer",
       "curl -o add-certificate.swift https://raw.githubusercontent.com/actions/runner-images/fb3b6fd69957772c1596848e2daaec69eabca1bb/images/macos/provision/configuration/add-certificate.swift",
@@ -135,13 +162,42 @@ build {
     ]
   }
 
-  // check there is at least 20GB of free space and fail if not
+  // check there is at least 15GB of free space and fail if not
   provisioner "shell" {
     inline = [
       "source ~/.zprofile",
       "df -h",
       "export FREE_MB=$(df -m | awk '{print $4}' | head -n 2 | tail -n 1)",
-      "[[ $FREE_MB -gt 15000 ]] && echo OK || exit 1"
+      "[[ $FREE_MB -gt ${var.disk_free_mb} ]] && echo OK || exit 1"
+    ]
+  }
+
+  // some other health checks
+  provisioner "shell" {
+    inline = [
+      "source ~/.zprofile",
+      "test -d /Users/admin"
+    ]
+  }
+
+  # Disable apsd[1][2] daemon as it causes high CPU usage after boot
+  #
+  # [1]: https://iboysoft.com/wiki/apsd-mac.html
+  # [2]: https://discussions.apple.com/thread/4459153
+  provisioner "shell" {
+    inline = [
+      "sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.apsd.plist"
+    ]
+  }
+
+  # Wait for the "update_dyld_sim_shared_cache" process[1][2] to finish
+  # to avoid wasting CPU cycles after boot
+  #
+  # [1]: https://apple.stackexchange.com/questions/412101/update-dyld-sim-shared-cache-is-taking-up-a-lot-of-memory
+  # [2]: https://stackoverflow.com/a/68394101/9316533
+  provisioner "shell" {
+    inline = [
+      "sleep 1800"
     ]
   }
 }
