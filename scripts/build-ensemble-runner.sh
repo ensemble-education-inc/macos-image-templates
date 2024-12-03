@@ -5,7 +5,7 @@
 REPO_ROOT=$(git rev-parse --show-toplevel)
 VARS_FILE="$REPO_ROOT/scripts/variables.json"
 
-tart pull "ghcr.io/cirruslabs/macos-sonoma-base:latest"
+tart pull "ghcr.io/cirruslabs/macos-sequoia-base:latest"
 
 packer init "$REPO_ROOT/templates/ensemble.pkr.hcl"
 
